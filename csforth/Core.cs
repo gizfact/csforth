@@ -1,8 +1,8 @@
 ﻿//------------------------------------------------------------------------------
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+//using System.Linq;
+//using System.Text;
 using System.Windows.Forms;
 //------------------------------------------------------------------------------
 namespace csforth
@@ -10,17 +10,21 @@ namespace csforth
     //------------------------------------------------------------------------------
     static class Core
     {
-        public delegate int ForthWord();
+        delegate int ForthWord();
 
         static Stack<object> fStack = new Stack<object>(1024);
 
-        static public string Input;
-        static public int InputPos = -1;
+        static string Input;
+        static public string InputText
+        {
+            set { Input = value; InputPos = 0; }
+        }
+        static int InputPos = -1;
 
-        static public int PC = 0;
-        static public object[] RuntimeCode = null;
+        static int PC = 0;
+        static object[] RuntimeCode = null;
 
-        static int CodeID = 21;
+        
         static int CurrentCode;
         static bool CompileFlag = false;
 
@@ -47,7 +51,8 @@ namespace csforth
             { ".d", 12 },
             { ".s", 13 },
             { "dup", 14 },
-            { "/d", 20 }
+            { "/d", 20 },
+            { "*d", 21 }
         };
 
         static private Dictionary<int, ForthWord> CodeFun = new Dictionary<int, ForthWord>
@@ -71,12 +76,15 @@ namespace csforth
             { 12, dprint },
             { 13, sprint },
             { 14, dup },
-            { 20, ddiv }
+            { 20, ddiv },
+            { 21, dmul }
         };
+
+        static int CodeID = 22;
 
         static private Dictionary<int, object[]> Code = new Dictionary<int, object[]>();
         //------------------------------------------------------------------------------
-        static public int Run()
+        static int Run()
         {
             try
             {
@@ -105,7 +113,21 @@ namespace csforth
         // Core, version 1.0
         //
         //------------------------------------------------------------------------------
-        static public object[] Compile()
+        static public int Interpret(string input = null)
+        {
+            // Компилируем строку и выполняем
+            if(input != null)
+            {
+                Input = input;
+                InputPos = 0;
+            }
+
+            RuntimeCode = Compile();
+            PC = 0;
+            return Run();
+        }
+        //------------------------------------------------------------------------------
+        static object[] Compile()
         {
             List<int> JmpList = new List<int>();
             List<object> CodeList = new List<object>();
@@ -607,7 +629,7 @@ namespace csforth
             return fStack.Pop().ToString();
         }
         //------------------------------------------------------------------------------
-        static public int GetCode(string word)
+        static int GetCode(string word)
         {
             int code = 0;
 
@@ -625,7 +647,7 @@ namespace csforth
             return exec;
         }
         //------------------------------------------------------------------------------
-        static public int ExecWord(string word)
+        static int ExecWord(string word)
         {
             int code;
 
@@ -641,7 +663,7 @@ namespace csforth
             return code;
         }
         //------------------------------------------------------------------------------
-        static public string Word(string stream, ref int curpos)
+        static string Word(string stream, ref int curpos)
         {
             if (stream == null || stream.Length == 0 || curpos < 0 || curpos >= stream.Length)
                 return null;
