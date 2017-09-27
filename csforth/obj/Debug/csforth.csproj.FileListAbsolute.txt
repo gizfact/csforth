@@ -6,3 +6,11 @@ D:\CSProj\csforth\csforth\obj\Debug\csforth.csproj.GenerateResource.Cache
 D:\CSProj\csforth\csforth\obj\Debug\csforth.exe
 D:\CSProj\csforth\csforth\obj\Debug\csforth.pdb
 D:\CSProj\csforth\csforth\obj\Debug\csforth.Form1.resources
+d:\repos\cs\csforth\csforth\obj\Debug\csforth.exe
+d:\repos\cs\csforth\csforth\obj\Debug\csforth.pdb
+d:\repos\cs\csforth\csforth\bin\Debug\csforth.exe
+d:\repos\cs\csforth\csforth\bin\Debug\csforth.pdb
+d:\repos\cs\csforth\csforth\obj\Debug\csforth.csprojResolveAssemblyReference.cache
+d:\repos\cs\csforth\csforth\obj\Debug\csforth.Form1.resources
+d:\repos\cs\csforth\csforth\obj\Debug\csforth.Properties.Resources.resources
+d:\repos\cs\csforth\csforth\obj\Debug\csforth.csproj.GenerateResource.Cache
