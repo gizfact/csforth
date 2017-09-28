@@ -1,6 +1,7 @@
 ﻿//------------------------------------------------------------------------------
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 //using System.Linq;
 //using System.Text;
 using System.Windows.Forms;
@@ -29,6 +30,7 @@ namespace csforth
         static bool CompileFlag = false;
 
         static public TextBox tbOutput = null;
+        static char DelimiterChar = 0.5.ToString()[1];
         //------------------------------------------------------------------------------
         static private Dictionary<string, int> WordCode = new Dictionary<string, int>
         {
@@ -214,7 +216,7 @@ namespace csforth
                     continue;
                 }
 
-                if (double.TryParse(word.Replace('.', ','), out dval))
+                if (double.TryParse(word.Replace('.', DelimiterChar), out dval))
                 {
                     CodeList.Add(-2);
                     CodeList.Add(dval);
@@ -414,7 +416,7 @@ namespace csforth
             if (val.GetType() == typeof(string))
             {
                 double d = 0;
-                if (double.TryParse((string)val, out d))
+                if (double.TryParse(((string)val).Replace('.', DelimiterChar), out d))
                     return 0;
 
                 fStack.Push(d);
@@ -610,7 +612,7 @@ namespace csforth
 
             double val = 0;
 
-            if (double.TryParse(obj.ToString(), out val) == true)
+            if (double.TryParse(obj.ToString().Replace('.', DelimiterChar), out val) == true)
             {
                 fStack.Pop();
                 return val;
