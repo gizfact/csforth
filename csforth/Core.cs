@@ -1,9 +1,10 @@
 ﻿//------------------------------------------------------------------------------
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Text;
 //using System.Globalization;
-//using System.Linq;
 //using System.Text;
 using System.Windows.Forms;
 //------------------------------------------------------------------------------
@@ -127,8 +128,21 @@ namespace csforth
         }
         //------------------------------------------------------------------------------
         //
-        // Core, version 1.0
+        // Core
         //
+        //------------------------------------------------------------------------------
+        static public string[] UserDictionary()
+        {
+            if (BaseLength == 0 || BaseLength == WordCode.Count)
+                return null;
+
+            string[] dic = new string[WordCode.Count - BaseLength];
+
+            for (int i = 0; i < WordCode.Count - BaseLength; i++)
+                dic[i] = WordCode.Keys.ElementAt(BaseLength + i);
+
+            return dic;
+        }
         //------------------------------------------------------------------------------
         static public void Clear()
         {
@@ -157,23 +171,20 @@ namespace csforth
             fStack.Clear();
         }
         //------------------------------------------------------------------------------
-        static public int Interpret(string input = null)
+        static public int Interpret(string input = null, bool isfile = false)
         {
             // Компилируем строку и выполняем
             if(input != null)
             {
-                Input = input;
+                if(isfile)
+                    Input = File.ReadAllText(input, Encoding.Default);
+                else
+                    Input = input;
+
                 InputPos = 0;
             }
 
-            //try
-            //{
             RuntimeCode = Compile();
-            //}
-            //catch
-            //{
-            //    return -1;
-            //}
 
             PC = 0;
             return Run();
@@ -199,6 +210,19 @@ namespace csforth
 
             while ((word = Word(Input, ref InputPos)) != null)
             {
+                if(word == "/*")
+                {
+                    // Комментарий
+                    ival = Input.IndexOf("*/", InputPos);
+                    if(ival >= 0)
+                    {
+                        InputPos = ival + 2;
+                        continue;
+                    }
+
+                    throw new InvalidOperationException("Not finishing comment");
+                }
+
                 if (word == ":")
                 {
                     if (CompileFlag)
@@ -235,6 +259,27 @@ namespace csforth
 
                     JmpList.Add(CodeList.Count - 1);
                     continue;
+                }
+
+                if(word == "else")
+                {
+                    // ничего не компилирует, заполняет смещение
+                    if (JmpList.Count > 0)
+                    {
+                        ival = JmpList[JmpList.Count - 1];
+                        //JmpList.RemoveAt(JmpList.Count - 1);
+
+                        if ((int)CodeList[ival] == 0)
+                        {
+                            CodeList[ival] = CodeList.Count - ival + 2;
+                            CodeList.Add(-6);
+                            CodeList.Add(0);
+                            JmpList[JmpList.Count - 1] = CodeList.Count - 1;
+                            continue;
+                        }
+                    }
+
+                    throw new InvalidOperationException("Branch word without begin part or incorrect");
                 }
 
                 if (word == "while")
@@ -809,7 +854,10 @@ namespace csforth
                 curpos++;
             }
 
-            return stream.Substring(pos, curpos - pos);
+            if(curpos > pos)
+                return stream.Substring(pos, curpos - pos);
+
+            return null;
         }
         //------------------------------------------------------------------------------
     }

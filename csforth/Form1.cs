@@ -20,19 +20,26 @@ namespace csforth
 
             Core.tbOutput = tbOut;
 
-            Core.InputText =
-                " : my -7.5 dup >i ; : my2 my ; : my3 my2 ; my3 if \" Hello, world!\" 3.14 -11 >d /d .d .s end >i .";
+            //Core.InputText =
+            //    " : my -7.5 dup >i ; : my2 my ; : my3 my2 ; my3 if \" Hello, world!\" 3.14 -11 >d /d .d .s end >i .";
             //"1000 while 1 - dup . end";
-            Core.Interpret();
 
-            Core.Interpret("1 dup if . end 111");
-            Core.Interpret(" . 1000 while 1 - dup . end");
-            Core.Interpret("26.8 1076.456 *d .d");
+            //Core.Interpret("0 if \" true\" else \" false\" end .s");
 
-            Core.Clear();
+            Core.Interpret(@"d:\out\test.txt", true);
+            
+            //Core.Interpret("5 5 + . /* Какая-то хрень*/ 7.0 7.0 /d .d");
 
-            Core.Interpret("cls \" Ok!\" .s");
+            //string[] my = Core.UserDictionary();
 
+            //Core.Interpret("1 dup if . end 111");
+            //Core.Interpret(" . 1000 while 1 - dup . end");
+            //Core.Interpret("26.8 1076.456 *d .d");
+
+            //Core.Clear();
+
+            //Core.Interpret("cls \" Ok!\" .s");
+            
         }
         //------------------------------------------------------------------------------
     }
