@@ -1,7 +1,8 @@
 ﻿//------------------------------------------------------------------------------
 using System;
 using System.Collections.Generic;
-using System.Globalization;
+using System.Linq;
+//using System.Globalization;
 //using System.Linq;
 //using System.Text;
 using System.Windows.Forms;
@@ -25,7 +26,6 @@ namespace csforth
         static int PC = 0;
         static object[] RuntimeCode = null;
 
-        
         static int CurrentCode;
         static bool CompileFlag = false;
 
@@ -38,6 +38,8 @@ namespace csforth
             { "dpush", -2 },
             { "spush", -3 },
             { "jz", -4 },
+            { "jz_peek", -5 },
+            { "jmp", -6 },
 
             { "word", 1 },
             { "find", 2 },
@@ -53,8 +55,13 @@ namespace csforth
             { ".d", 12 },
             { ".s", 13 },
             { "dup", 14 },
+            { "-", 15 },
             { "/d", 20 },
-            { "*d", 21 }
+            { "*d", 21 },
+            { "cls", 22 },
+            { "swap", 23 },
+            { "over", 24 },
+            { "rot", 25 }
         };
 
         static private Dictionary<int, ForthWord> CodeFun = new Dictionary<int, ForthWord>
@@ -63,6 +70,8 @@ namespace csforth
             { -2, dpush },
             { -3, spush },
             { -4, jz },
+            { -5, jz_peek },
+            { -6, jmp },
 
             { 1, word },
             { 2, find },
@@ -78,11 +87,17 @@ namespace csforth
             { 12, dprint },
             { 13, sprint },
             { 14, dup },
+            { 15, iminus },
             { 20, ddiv },
-            { 21, dmul }
+            { 21, dmul },
+            { 22, cls },
+            { 23, swap },
+            { 24, over },
+            { 25, rot }
         };
 
-        static int CodeID = 22;
+        static int BaseLength = 0;
+        static int CodeID;
 
         static private Dictionary<int, object[]> Code = new Dictionary<int, object[]>();
         //------------------------------------------------------------------------------
@@ -115,6 +130,33 @@ namespace csforth
         // Core, version 1.0
         //
         //------------------------------------------------------------------------------
+        static public void Clear()
+        {
+            // WordCode, CodeFun
+            if (BaseLength == 0)
+            {
+                BaseLength = WordCode.Count;
+            }
+            else
+            {
+                int cnt = WordCode.Count;
+
+                for (int i = BaseLength; i < cnt; i++)
+                {
+                    CodeFun.Remove(WordCode.Values.ElementAt(BaseLength));
+                    WordCode.Remove(WordCode.Keys.ElementAt(BaseLength));
+                }
+            }
+
+            CodeID = CodeFun.Keys.Max() + 1;
+
+            // Code
+            Code.Clear();
+
+            // Stack
+            fStack.Clear();
+        }
+        //------------------------------------------------------------------------------
         static public int Interpret(string input = null)
         {
             // Компилируем строку и выполняем
@@ -124,13 +166,30 @@ namespace csforth
                 InputPos = 0;
             }
 
+            //try
+            //{
             RuntimeCode = Compile();
+            //}
+            //catch
+            //{
+            //    return -1;
+            //}
+
             PC = 0;
             return Run();
         }
         //------------------------------------------------------------------------------
         static object[] Compile()
         {
+            //static int BaseLength = 0;
+            //static int CodeID;
+            // WordCode, CodeFun
+            if(BaseLength == 0)
+            {
+                BaseLength = WordCode.Count;
+                CodeID = CodeFun.Keys.Max() + 1;
+            }
+
             List<int> JmpList = new List<int>();
             List<object> CodeList = new List<object>();
             string word;
@@ -178,18 +237,37 @@ namespace csforth
                     continue;
                 }
 
+                if (word == "while")
+                {
+                    CodeList.Add(-5);
+                    CodeList.Add(1);
+
+                    JmpList.Add(CodeList.Count - 1);
+                    continue;
+                }
+
                 if (word == "end")
                 {
                     // ничего не компилирует, заполняет смещение
                     if (JmpList.Count > 0)
                     {
                         ival = JmpList[JmpList.Count - 1];
-                        CodeList[ival] = CodeList.Count - ival;
                         JmpList.RemoveAt(JmpList.Count - 1);
-                        continue;
+                        if ((int)CodeList[ival] == 0)
+                        {
+                            CodeList[ival] = CodeList.Count - ival;
+                            continue;
+                        }
+                        if ((int)CodeList[ival] == 1)
+                        {
+                            CodeList[ival] = CodeList.Count - ival + 2;
+                            CodeList.Add(-6);   // jmp
+                            CodeList.Add(ival - CodeList.Count - 1);     // To begin while
+                            continue;
+                        }
                     }
 
-                    throw new InvalidOperationException("End without if");
+                    throw new InvalidOperationException("End without begin part or incorrect");
                 }
 
                 if (word == "\"")
@@ -236,6 +314,12 @@ namespace csforth
             return CodeList != null ? CodeList.ToArray() : null;
         }
         //------------------------------------------------------------------------------
+        static int cls()
+        {
+            tbOutput.Clear();
+            return 0;
+        }
+        //------------------------------------------------------------------------------
         static int ipush()
         {
             fStack.Push((int)RuntimeCode[PC++]);
@@ -267,6 +351,16 @@ namespace csforth
         static int jz()
         {
             if ((int)fStack.Pop() != 0)
+                PC++;
+            else
+                PC += (int)RuntimeCode[PC];
+
+            return 0;
+        }
+        //------------------------------------------------------------------------------
+        static int jz_peek()
+        {
+            if ((int)fStack.Peek() != 0)
                 PC++;
             else
                 PC += (int)RuntimeCode[PC];
@@ -365,6 +459,37 @@ namespace csforth
         static int dup()
         {
             fStack.Push(fStack.Peek());
+
+            return 0;
+        }
+        //------------------------------------------------------------------------------
+        static int swap()
+        {
+            object hi = fStack.Pop();
+            object lo = fStack.Pop();
+
+            fStack.Push(hi);
+            fStack.Push(lo);
+
+            return 0;
+        }
+        //------------------------------------------------------------------------------
+        static int over()
+        {
+            fStack.Push(fStack.ElementAt(fStack.Count - 2));
+
+            return 0;
+        }
+        //------------------------------------------------------------------------------
+        static int rot()
+        {
+            object hi = fStack.Pop();
+            object mi = fStack.Pop();
+            object lo = fStack.Pop();
+
+            fStack.Push(mi);
+            fStack.Push(hi);
+            fStack.Push(lo);
 
             return 0;
         }
