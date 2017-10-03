@@ -1,0 +1,25 @@
+/* Пример программы */
+
+: Test
+	if "true" else "false" end
+;
+
+: Divide
+	1.0 8.1 /d .d
+;
+	
+: Fact
+  dup 1.0 >d if
+    dup 1.0 -d Fact *d
+  else
+    drop 1.0
+  end
+;
+
+: Goal
+	1.5 ->i Test Divide .s 100.0 Fact .d
+	"Hello, world!" dup " world" dup -rot s.pos swap rot .s .s .
+; 
+
+Goal
+

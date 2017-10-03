@@ -1,0 +1,9 @@
+d:\repos\cs\csforth\csforth\bin\Release\test.txt
+d:\repos\cs\csforth\csforth\bin\Release\csforth.exe
+d:\repos\cs\csforth\csforth\bin\Release\csforth.pdb
+d:\repos\cs\csforth\csforth\obj\Release\csforth.Form1.resources
+d:\repos\cs\csforth\csforth\obj\Release\csforth.Properties.Resources.resources
+d:\repos\cs\csforth\csforth\obj\Release\csforth.csproj.GenerateResource.Cache
+d:\repos\cs\csforth\csforth\obj\Release\csforth.exe
+d:\repos\cs\csforth\csforth\obj\Release\csforth.pdb
+d:\repos\cs\csforth\csforth\obj\Release\csforth.csprojResolveAssemblyReference.cache

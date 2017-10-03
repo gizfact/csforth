@@ -11,8 +11,9 @@ using System.Windows.Forms;
 namespace csforth
 {
     //------------------------------------------------------------------------------
-    static class Core
+    static partial class Core
     {
+        //------------------------------------------------------------------------------
         delegate int ForthWord();
 
         static Stack<object> fStack = new Stack<object>(1024);
@@ -33,74 +34,94 @@ namespace csforth
         static public TextBox tbOutput = null;
         static char DelimiterChar = 0.5.ToString()[1];
         //------------------------------------------------------------------------------
-        static private Dictionary<string, int> WordCode = new Dictionary<string, int>
+        struct xWord
         {
-            { "ipush", -1 },
-            { "dpush", -2 },
-            { "spush", -3 },
-            { "jz", -4 },
-            { "jz_peek", -5 },
-            { "jmp", -6 },
+            public int id;
+            public string name;
+            public ForthWord fun;
+            public object[] code;
 
-            { "word", 1 },
-            { "find", 2 },
-            { "exec", 3 },
-            { "drop", 4 },
-            { "a>i", 5 },
-            { "a>d", 6 },
-            { "+", 7 },
-            { "+d", 8 },
-            { ">i", 9 },
-            { ">d", 10 },
-            { ".", 11 },
-            { ".d", 12 },
-            { ".s", 13 },
-            { "dup", 14 },
-            { "-", 15 },
-            { "/d", 20 },
-            { "*d", 21 },
-            { "cls", 22 },
-            { "swap", 23 },
-            { "over", 24 },
-            { "rot", 25 }
+            public xWord(string n, int i, ForthWord f, object[] c = null) { name = n; id = i; fun = f; code = c; }
         };
 
-        static private Dictionary<int, ForthWord> CodeFun = new Dictionary<int, ForthWord>
+        static List<xWord> MainDic = new List<xWord>
         {
-            { -1, ipush },
-            { -2, dpush },
-            { -3, spush },
-            { -4, jz },
-            { -5, jz_peek },
-            { -6, jmp },
+            new xWord("ipush", -1, ipush ),
+            new xWord("dpush", -2, dpush),
+            new xWord("spush", -3, spush),
+            new xWord("jz", -4, jz),
+            new xWord("jz_peek", -5, jz_peek),
+            new xWord("jmp", -6, jmp),
 
-            { 1, word },
-            { 2, find },
-            { 3, exec },
-            { 4, drop },
-            { 5, atoi },
-            { 6, atod },
-            { 7, iplus },
-            { 8, dplus },
-            { 9, toi },
-            { 10, tod },
-            { 11, iprint },
-            { 12, dprint },
-            { 13, sprint },
-            { 14, dup },
-            { 15, iminus },
-            { 20, ddiv },
-            { 21, dmul },
-            { 22, cls },
-            { 23, swap },
-            { 24, over },
-            { 25, rot }
+            new xWord("word", 1, word),
+            new xWord("find", 2, find),
+            new xWord("exec", 3, exec),
+
+            // Stack words
+            new xWord("drop", 50, drop),
+            new xWord("dup", 51, dup),
+            new xWord("swap", 52, swap),
+            new xWord("over", 53, over),
+            new xWord("rot", 54, rot),
+            new xWord("-rot", 55, nrot),
+
+            // iMath words
+            new xWord("+", 100, iplus),
+            new xWord("-", 101, iminus),
+            new xWord("*", 102, imul),
+            new xWord("/", 103, idiv),
+            new xWord("1+", 104, inc),
+            new xWord("1-", 105, dec),
+            new xWord("asl", 106, asl),
+            new xWord("asr", 107, asr),
+            new xWord("asln", 108, asln),
+            new xWord("asrn", 109, asrn),
+            new xWord("shl", 110, shl),
+            new xWord("shr", 111, shr),
+            new xWord("shln", 112, shln),
+            new xWord("shrn", 113, shrn),
+            new xWord("abs", 114, abs),
+            new xWord("neg", 115, neg),
+            new xWord("not", 116, not),
+            new xWord("and", 117, and),
+            new xWord("or", 118, or),
+            new xWord("xor", 119, xor),
+
+            // dMath words
+            new xWord("+d", 150, dplus),
+            new xWord("-d", 151, dminus),
+            new xWord("*d", 152, dmul),
+            new xWord("/d", 153, ddiv),
+
+            // Convertation words
+            new xWord("a->i", 200, atoi),
+            new xWord("a->d", 201, atod),
+            new xWord("->i", 202, toi),
+            new xWord("->d", 203, tod),
+
+            // Output
+            new xWord(".", 300, iprint),
+            new xWord(".d", 301, dprint),
+            new xWord(".s", 302, sprint),
+            new xWord("cls", 303, cls),
+
+            // Условия
+            new xWord(">", 400, g_then),
+            new xWord("<", 401, l_then),
+            new xWord(">=", 402, ge_then),
+            new xWord("<=", 403, le_then),
+            new xWord(">d", 404, g_then_d),
+            new xWord("<d", 405, l_then_d),
+            new xWord(">=d", 406, ge_then_d),
+            new xWord("<=d", 407, le_then_d),
+
+            // Строковые
+            new xWord("s[]", 500, schar),
+            new xWord("s.pos", 501, spos)
         };
 
         static int BaseLength = 0;
         static int CodeID;
-
-        static private Dictionary<int, object[]> Code = new Dictionary<int, object[]>();
         //------------------------------------------------------------------------------
         static int Run()
         {
@@ -133,13 +154,13 @@ namespace csforth
         //------------------------------------------------------------------------------
         static public string[] UserDictionary()
         {
-            if (BaseLength == 0 || BaseLength == WordCode.Count)
+            if (BaseLength == 0 || BaseLength == MainDic.Count)
                 return null;
 
-            string[] dic = new string[WordCode.Count - BaseLength];
+            string[] dic = new string[MainDic.Count - BaseLength];
 
-            for (int i = 0; i < WordCode.Count - BaseLength; i++)
-                dic[i] = WordCode.Keys.ElementAt(BaseLength + i);
+            for (int i = 0; i < MainDic.Count - BaseLength; i++)
+                dic[i] = MainDic.ElementAt(BaseLength + i).name;
 
             return dic;
         }
@@ -149,23 +170,25 @@ namespace csforth
             // WordCode, CodeFun
             if (BaseLength == 0)
             {
-                BaseLength = WordCode.Count;
+                BaseLength = MainDic.Count;
             }
             else
             {
-                int cnt = WordCode.Count;
+                int cnt = MainDic.Count;
 
                 for (int i = BaseLength; i < cnt; i++)
                 {
-                    CodeFun.Remove(WordCode.Values.ElementAt(BaseLength));
-                    WordCode.Remove(WordCode.Keys.ElementAt(BaseLength));
+                    //CodeFun.Remove(WordCode.Values.ElementAt(BaseLength));
+                    //WordCode.Remove(WordCode.Keys.ElementAt(BaseLength));
+                    MainDic.RemoveAt(BaseLength);
                 }
             }
 
-            CodeID = CodeFun.Keys.Max() + 1;
+            //CodeID = CodeFun.Keys.Max() + 1;
+            CodeID = MainDic.Max(e => e.id) + 1;
 
             // Code
-            Code.Clear();
+            //Code.Clear();
 
             // Stack
             fStack.Clear();
@@ -197,8 +220,9 @@ namespace csforth
             // WordCode, CodeFun
             if(BaseLength == 0)
             {
-                BaseLength = WordCode.Count;
-                CodeID = CodeFun.Keys.Max() + 1;
+                BaseLength = MainDic.Count;
+                //CodeID = CodeFun.Keys.Max() + 1;
+                CodeID = MainDic.Max(e => e.id) + 1;
             }
 
             List<int> JmpList = new List<int>();
@@ -232,12 +256,27 @@ namespace csforth
                     if (word == null)
                         throw new InvalidOperationException("Compiling name absent");
 
-                    WordCode.Add(word, CodeID);
-                    CodeFun.Add(CodeID, exec);
-
+                    //WordCode.Add(word, CodeID);
+                    //CodeFun.Add(CodeID, exec);
+                    
                     CompileFlag = true;
-                    object[] arWC = Compile();
-                    Code.Add(CodeID++, arWC);
+                    MainDic.Add(new xWord(word, CodeID++, exec));
+                    ival = MainDic.Count - 1;
+                    //object[] arWC = Compile();
+                    //xWord x = new xWord(
+                    //    MainDic[ival].name,
+                    //    MainDic[ival].id,
+                    //    MainDic[ival].fun,
+                    //    arWC);
+
+                    xWord x = MainDic[ival];
+                    x.code = Compile();
+
+                    MainDic[ival] = x;
+                 
+                    //MainDic[MainDic.Count - 1].code = Compile();
+                    //Code.Add(CodeID++, arWC);
+                    
                     CompileFlag = false;
                     continue;
                 }
@@ -315,21 +354,32 @@ namespace csforth
                     throw new InvalidOperationException("End without begin part or incorrect");
                 }
 
-                if (word == "\"")
+                if (word[0] == '\"' && word[word.Length - 1] == '\"')
                 {
-                    // Строка
+                    // Строка?
+                    CodeList.Add(-3);
+                    CodeList.Add(word.Substring(1, word.Length - 2));
+                    continue;
+
+                    /*
                     ival = Input.IndexOf("\"", InputPos);
                     if (ival >= 0)
                     {
-                        word = Input.Substring(InputPos, ival - InputPos).TrimStart();
-                        CodeList.Add(-3);
-                        CodeList.Add(word);
                         InputPos = ival + 1;
-                        continue;
+                        ival = Input.IndexOf("\"", InputPos);
+                        if (ival >= 0)
+                        {
+                            word = Input.Substring(InputPos, ival - InputPos);
+                            CodeList.Add(-3);
+                            CodeList.Add(word);
+                            InputPos = ival + 1;
+                            continue;
+                        }
                     }
 
                     // Косяк
                     throw new InvalidOperationException("Not valid type (literal)");
+                    */
                 }
 
                 if (int.TryParse(word, out ival))
@@ -420,6 +470,49 @@ namespace csforth
             return 0;
         }
         //------------------------------------------------------------------------------
+        //------------------------------------------------------------------------------
+        // double УСЛОВИЯ
+        //------------------------------------------------------------------------------
+        static int g_then_d()
+        {
+            double hi = (double)fStack.Pop();
+            double lo = (double)fStack.Pop();
+
+            fStack.Push(lo > hi ? -1 : 0);
+
+            return 0;
+        }
+        //------------------------------------------------------------------------------
+        static int l_then_d()
+        {
+            double hi = (double)fStack.Pop();
+            double lo = (double)fStack.Pop();
+
+            fStack.Push(lo < hi ? -1 : 0);
+
+            return 0;
+        }
+        //------------------------------------------------------------------------------
+        static int ge_then_d()
+        {
+            double hi = (double)fStack.Pop();
+            double lo = (double)fStack.Pop();
+
+            fStack.Push(lo >= hi ? -1 : 0);
+
+            return 0;
+        }
+        //------------------------------------------------------------------------------
+        static int le_then_d()
+        {
+            double hi = (double)fStack.Pop();
+            double lo = (double)fStack.Pop();
+
+            fStack.Push(lo <= hi ? -1 : 0);
+
+            return 0;
+        }
+        //------------------------------------------------------------------------------
         static int iprint()
         {
             tbOutput.Text = tbOutput.Text + ((int)fStack.Pop()).ToString() + Environment.NewLine;
@@ -475,15 +568,17 @@ namespace csforth
         static int exec()
         {
             // в коде
-            object[] arWC;
+            //object[] arWC;
 
-            if (Code.TryGetValue(CurrentCode, out arWC))
+            IEnumerable<xWord> ienum = MainDic.Where(e => e.id == CurrentCode);
+
+            if (ienum != null && ienum.Count() > 0)
             {
                 // Выполнить код arWC
                 int oldPC = PC;
                 object[] oldRuntimeCode = RuntimeCode;
                 PC = 0;
-                RuntimeCode = arWC;
+                RuntimeCode = ienum.Last().code;
 
                 Run();
 
@@ -494,50 +589,7 @@ namespace csforth
             return 0;
         }
         //------------------------------------------------------------------------------
-        static int drop()
-        {
-            fStack.Pop();
-
-            return 0;
-        }
-        //------------------------------------------------------------------------------
-        static int dup()
-        {
-            fStack.Push(fStack.Peek());
-
-            return 0;
-        }
-        //------------------------------------------------------------------------------
-        static int swap()
-        {
-            object hi = fStack.Pop();
-            object lo = fStack.Pop();
-
-            fStack.Push(hi);
-            fStack.Push(lo);
-
-            return 0;
-        }
-        //------------------------------------------------------------------------------
-        static int over()
-        {
-            fStack.Push(fStack.ElementAt(fStack.Count - 2));
-
-            return 0;
-        }
-        //------------------------------------------------------------------------------
-        static int rot()
-        {
-            object hi = fStack.Pop();
-            object mi = fStack.Pop();
-            object lo = fStack.Pop();
-
-            fStack.Push(mi);
-            fStack.Push(hi);
-            fStack.Push(lo);
-
-            return 0;
-        }
+        // Convertation
         //------------------------------------------------------------------------------
         static int toi()
         {
@@ -593,66 +645,6 @@ namespace csforth
             }
 
             throw new FormatException("Ошибка преобразования (double)");
-        }
-        //------------------------------------------------------------------------------
-        static int iplus()
-        {
-            object hi = fStack.Pop();
-            object lo = fStack.Pop();
-
-            if (hi.GetType() == typeof(int) && lo.GetType() == typeof(int))
-            {
-                fStack.Push((int)lo + (int)hi);
-            }
-            else
-                throw new InvalidOperationException("Not valid type (integer)");
-
-            return 0;
-        }
-        //------------------------------------------------------------------------------
-        static int iminus()
-        {
-            object hi = fStack.Pop();
-            object lo = fStack.Pop();
-
-            if (hi.GetType() == typeof(int) && lo.GetType() == typeof(int))
-            {
-                fStack.Push((int)lo - (int)hi);
-            }
-            else
-                throw new InvalidOperationException("Not valid type (integer)");
-
-            return 0;
-        }
-        //------------------------------------------------------------------------------
-        static int imul()
-        {
-            object hi = fStack.Pop();
-            object lo = fStack.Pop();
-
-            if (hi.GetType() == typeof(int) && lo.GetType() == typeof(int))
-            {
-                fStack.Push((int)lo * (int)hi);
-            }
-            else
-                throw new InvalidOperationException("Not valid type (integer)");
-
-            return 0;
-        }
-        //------------------------------------------------------------------------------
-        static int idiv()
-        {
-            object hi = fStack.Pop();
-            object lo = fStack.Pop();
-
-            if (hi.GetType() == typeof(int) && lo.GetType() == typeof(int))
-            {
-                fStack.Push((int)lo / (int)hi);
-            }
-            else
-                throw new InvalidOperationException("Not valid type (integer)");
-
-            return 0;
         }
         //------------------------------------------------------------------------------
         static int dplus()
@@ -803,18 +795,24 @@ namespace csforth
         //------------------------------------------------------------------------------
         static int GetCode(string word)
         {
-            int code = 0;
+            int id = 0;
 
-            WordCode.TryGetValue(word, out code);
+            //WordCode.TryGetValue(word, out code);
+            IEnumerable<xWord> ienum = MainDic.Where(e => e.name == word);
+            if (ienum != null && ienum.Count() > 0)
+                id = ienum.Last().id;
 
-            return code;
+            return id;
         }
         //------------------------------------------------------------------------------
-        static ForthWord GetExec(int code)
+        static ForthWord GetExec(int id)
         {
             ForthWord exec = null;
 
-            CodeFun.TryGetValue(code, out exec);
+            //CodeFun.TryGetValue(code, out exec);
+            IEnumerable<xWord> ienum = MainDic.Where(e => e.id == id);
+            if (ienum != null && ienum.Count() > 0)
+                exec = ienum.Last().fun;
 
             return exec;
         }
@@ -847,13 +845,29 @@ namespace csforth
             }
 
             int pos = curpos;
-
-            while (curpos < stream.Length)
+            bool isstr = false;
+            
+            if(curpos < stream.Length && stream[curpos] == '\"')
             {
-                if (char.IsWhiteSpace(stream[curpos]) == true) break;
+                isstr = true;
                 curpos++;
             }
 
+            //string s = stream.Substring(pos);
+
+            while (curpos < stream.Length)
+            {
+                if (!isstr)
+                {
+                    if (char.IsWhiteSpace(stream[curpos]) == true) break;
+                }
+                else
+                if (curpos > 0 && stream[curpos] == '\"') break;
+
+                curpos++;
+            }
+
+            if (isstr) curpos++;
             if(curpos > pos)
                 return stream.Substring(pos, curpos - pos);
 

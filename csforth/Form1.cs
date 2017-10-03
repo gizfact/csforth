@@ -7,6 +7,7 @@
 //using System.Drawing;
 //using System.Linq;
 //using System.Text;
+using System;
 using System.Windows.Forms;
 //------------------------------------------------------------------------------
 namespace csforth
@@ -25,8 +26,8 @@ namespace csforth
             //"1000 while 1 - dup . end";
 
             //Core.Interpret("0 if \" true\" else \" false\" end .s");
-
-            Core.Interpret(@"d:\out\test.txt", true);
+            //Core.Interpret("\"Hello, world!\" .s");
+            Core.Interpret("test.txt", true);
             
             //Core.Interpret("5 5 + . /* Какая-то хрень*/ 7.0 7.0 /d .d");
 

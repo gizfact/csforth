@@ -22,3 +22,4 @@ d:\Repos\csforth\csforth\obj\Debug\csforth.csprojResolveAssemblyReference.cache
 d:\Repos\csforth\csforth\obj\Debug\csforth.Form1.resources
 d:\Repos\csforth\csforth\obj\Debug\csforth.Properties.Resources.resources
 d:\Repos\csforth\csforth\obj\Debug\csforth.csproj.GenerateResource.Cache
+d:\repos\cs\csforth\csforth\bin\Debug\test.txt
