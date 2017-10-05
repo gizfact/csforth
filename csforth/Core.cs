@@ -30,113 +30,129 @@ namespace csforth
 
         static int CurrentCode;
         static bool CompileFlag = false;
+        static bool ClassFlag = false;
 
         static public TextBox tbOutput = null;
         static char DelimiterChar = 0.5.ToString()[1];
+
+        static Stack<List<xWord>> dicStack = new Stack<List<xWord>>(32);
         //------------------------------------------------------------------------------
         struct xWord
         {
-            public int id;
+            //public int id;
             public string name;
             public ForthWord fun;
             public object[] code;
+            //public List<xWord> sub;
 
-            public xWord(string n, int i, ForthWord f, object[] c = null) { name = n; id = i; fun = f; code = c; }
+            public xWord(string n, ForthWord f, object[] c = null) { name = n; fun = f; code = c; }
+            //public xWord(string n, ForthWord f, List<xWord> s) { name = n; fun = f; code = null; sub = s; }
         };
 
-        static List<xWord> MainDic = new List<xWord>
+        static List<xWord> sysDic = new List<xWord>
         {
-            new xWord("ipush", -1, ipush ),
-            new xWord("dpush", -2, dpush),
-            new xWord("spush", -3, spush),
-            new xWord("jz", -4, jz),
-            new xWord("jz_peek", -5, jz_peek),
-            new xWord("jmp", -6, jmp),
+            new xWord("resetdic", resetdic),
+            new xWord("ipush", ipush ),
+            new xWord("dpush", dpush),
+            new xWord("spush", spush),
+            new xWord("jz", jz),
+            new xWord("jz_peek", jz_peek),
+            new xWord("jmp", jmp),
 
-            new xWord("word", 1, word),
-            new xWord("find", 2, find),
-            new xWord("exec", 3, exec),
+            new xWord("word", word),
+            new xWord("find", find),
+            new xWord("exec", exec),
 
             // Stack words
-            new xWord("drop", 50, drop),
-            new xWord("dup", 51, dup),
-            new xWord("swap", 52, swap),
-            new xWord("over", 53, over),
-            new xWord("rot", 54, rot),
-            new xWord("-rot", 55, nrot),
+            new xWord("drop", drop),
+            new xWord("dup", dup),
+            new xWord("swap", swap),
+            new xWord("over", over),
+            new xWord("rot", rot),
+            new xWord("-rot", nrot),
 
             // iMath words
-            new xWord("+", 100, iplus),
-            new xWord("-", 101, iminus),
-            new xWord("*", 102, imul),
-            new xWord("/", 103, idiv),
-            new xWord("1+", 104, inc),
-            new xWord("1-", 105, dec),
-            new xWord("asl", 106, asl),
-            new xWord("asr", 107, asr),
-            new xWord("asln", 108, asln),
-            new xWord("asrn", 109, asrn),
-            new xWord("shl", 110, shl),
-            new xWord("shr", 111, shr),
-            new xWord("shln", 112, shln),
-            new xWord("shrn", 113, shrn),
-            new xWord("abs", 114, abs),
-            new xWord("neg", 115, neg),
-            new xWord("not", 116, not),
-            new xWord("and", 117, and),
-            new xWord("or", 118, or),
-            new xWord("xor", 119, xor),
+            new xWord("+", iplus),
+            new xWord("-", iminus),
+            new xWord("*", imul),
+            new xWord("/", idiv),
+            new xWord("1+", inc),
+            new xWord("1-", dec),
+            new xWord("asl", asl),
+            new xWord("asr", asr),
+            new xWord("asln", asln),
+            new xWord("asrn", asrn),
+            new xWord("shl", shl),
+            new xWord("shr", shr),
+            new xWord("shln", shln),
+            new xWord("shrn", shrn),
+            new xWord("abs", abs),
+            new xWord("neg", neg),
+            new xWord("not", not),
+            new xWord("and", and),
+            new xWord("or", or),
+            new xWord("xor", xor),
 
             // dMath words
-            new xWord("+d", 150, dplus),
-            new xWord("-d", 151, dminus),
-            new xWord("*d", 152, dmul),
-            new xWord("/d", 153, ddiv),
+            new xWord("+d", dplus),
+            new xWord("-d", dminus),
+            new xWord("*d", dmul),
+            new xWord("/d", ddiv),
+            new xWord("absd", dabs),
+            new xWord("negd", dneg),
 
             // Convertation words
-            new xWord("a->i", 200, atoi),
-            new xWord("a->d", 201, atod),
-            new xWord("->i", 202, toi),
-            new xWord("->d", 203, tod),
+            new xWord("a->i", atoi),
+            new xWord("a->d", atod),
+            new xWord("->i", toi),
+            new xWord("->d", tod),
 
             // Output
-            new xWord(".", 300, iprint),
-            new xWord(".d", 301, dprint),
-            new xWord(".s", 302, sprint),
-            new xWord("cls", 303, cls),
+            new xWord(".", iprint),
+            new xWord(".d", dprint),
+            new xWord(".s", sprint),
+            new xWord("cls", cls),
+            new xWord(".u16", uprint16),
 
             // Условия
-            new xWord(">", 400, g_then),
-            new xWord("<", 401, l_then),
-            new xWord(">=", 402, ge_then),
-            new xWord("<=", 403, le_then),
-            new xWord(">d", 404, g_then_d),
-            new xWord("<d", 405, l_then_d),
-            new xWord(">=d", 406, ge_then_d),
-            new xWord("<=d", 407, le_then_d),
+            new xWord(">", g_then),
+            new xWord("<", l_then),
+            new xWord(">=", ge_then),
+            new xWord("<=", le_then),
+            new xWord(">d", g_then_d),
+            new xWord("<d", l_then_d),
+            new xWord(">=d", ge_then_d),
+            new xWord("<=d", le_then_d),
 
             // Строковые
-            new xWord("s[]", 500, schar),
-            new xWord("s.pos", 501, spos)
+            new xWord("s[]", schar),
+            new xWord("s.pos", spos),
+            new xWord("format", format),
+            new xWord("+s", splus)
         };
 
+        static List<xWord> MainDic = sysDic;
+        static List<xWord> ClassDic;
+
         static int BaseLength = 0;
-        static int CodeID;
+        //static int CodeID;
         //------------------------------------------------------------------------------
         static int Run()
         {
             try
             {
-                ForthWord fw;
+                //ForthWord fw;
 
                 while (PC < RuntimeCode.Length)
                 {
                     CurrentCode = (int)RuntimeCode[PC++];
 
-                    if ((fw = GetExec(CurrentCode)) != null)
-                    {
-                        fw();
-                    }
+                    MainDic[CurrentCode].fun();
+
+                    //if ((fw = MainDic[CurrentCode].fun) != null)
+                    //{
+                    //    fw();
+                    //}
                 }
             }
             catch(Exception ex)
@@ -185,8 +201,8 @@ namespace csforth
             }
 
             //CodeID = CodeFun.Keys.Max() + 1;
-            CodeID = MainDic.Max(e => e.id) + 1;
-
+            //CodeID = MainDic.Max(e => e.id) + 1;
+           
             // Code
             //Code.Clear();
 
@@ -213,6 +229,21 @@ namespace csforth
             return Run();
         }
         //------------------------------------------------------------------------------
+        static int setdic()
+        {
+            dicStack.Push(MainDic);
+            MainDic = (List<xWord>)MainDic[CurrentCode].code[0];
+
+            return 0;
+        }
+        //------------------------------------------------------------------------------
+        static int resetdic()
+        {
+            MainDic = dicStack.Pop();
+
+            return 0;
+        }
+        //------------------------------------------------------------------------------
         static object[] Compile()
         {
             //static int BaseLength = 0;
@@ -222,7 +253,7 @@ namespace csforth
             {
                 BaseLength = MainDic.Count;
                 //CodeID = CodeFun.Keys.Max() + 1;
-                CodeID = MainDic.Max(e => e.id) + 1;
+                //CodeID = MainDic.Max(e => e.id) + 1;
             }
 
             List<int> JmpList = new List<int>();
@@ -259,9 +290,26 @@ namespace csforth
                     //WordCode.Add(word, CodeID);
                     //CodeFun.Add(CodeID, exec);
                     
+                    
                     CompileFlag = true;
-                    MainDic.Add(new xWord(word, CodeID++, exec));
-                    ival = MainDic.Count - 1;
+                    xWord x;
+
+                    if (ClassFlag)
+                    {
+                        ClassDic.Add(new xWord(word, exec));
+                        ival = ClassDic.Count - 1;
+                        x = ClassDic[ival];
+                        x.code = Compile();
+                        ClassDic[ival] = x;
+                    }
+                    else
+                    {
+                        MainDic.Add(new xWord(word, exec));
+                        ival = MainDic.Count - 1;
+                        x = MainDic[ival];
+                        x.code = Compile();
+                        MainDic[ival] = x;
+                    }
                     //object[] arWC = Compile();
                     //xWord x = new xWord(
                     //    MainDic[ival].name,
@@ -269,10 +317,10 @@ namespace csforth
                     //    MainDic[ival].fun,
                     //    arWC);
 
-                    xWord x = MainDic[ival];
-                    x.code = Compile();
+                    
+                    
 
-                    MainDic[ival] = x;
+                   
                  
                     //MainDic[MainDic.Count - 1].code = Compile();
                     //Code.Add(CodeID++, arWC);
@@ -281,18 +329,55 @@ namespace csforth
                     continue;
                 }
 
+                if(word == "class")
+                {
+                    if(ClassFlag || CompileFlag)
+                        throw new InvalidOperationException("Nested class definition");
+
+                    // Компиляция класса
+                    ClassFlag = true;
+
+                    word = Word(Input, ref InputPos);
+                    if (word == null)
+                        throw new InvalidOperationException("Class name absent");
+
+                    ClassDic = new List<xWord>();
+                    object[] obj = new object[1];
+                    obj[0] = ClassDic;
+                    MainDic.Add(new xWord(word, setdic, obj));
+                    continue;
+                }
+
                 if (word == ";")
                 {
-                    if (!CompileFlag)
-                        throw new InvalidOperationException("Not started compilation");
+                    if (CompileFlag)
+                    {
+                        if(ClassFlag)
+                        {
+                            // в классе
+                            if (CodeList != null)
+                                CodeList.Add(GetCode("resetdic"));
+                            //ClassDic = null;
+                        }
+                        return CodeList != null ? CodeList.ToArray() : null;
+                    }
 
-                    return CodeList != null ? CodeList.ToArray() : null;
+                    if(ClassFlag)
+                    {
+                        ClassFlag = false;
+                        ClassDic = null;
+
+                        continue;
+                    }
+
+                    
+                    throw new InvalidOperationException("Not started compilation");
                 }
 
                 if (word == "if")
                 {
                     // if - если на стеке не 0 идем дальше
-                    CodeList.Add(-4);
+                    CodeList.Add(GetCode("jz"));
                     // А вот сюда нужно будет смещение положить
                     CodeList.Add(0);
 
@@ -311,7 +396,7 @@ namespace csforth
                         if ((int)CodeList[ival] == 0)
                         {
                             CodeList[ival] = CodeList.Count - ival + 2;
-                            CodeList.Add(-6);
+                            CodeList.Add(GetCode("jmp"));
                             CodeList.Add(0);
                             JmpList[JmpList.Count - 1] = CodeList.Count - 1;
                             continue;
@@ -323,7 +408,7 @@ namespace csforth
 
                 if (word == "while")
                 {
-                    CodeList.Add(-5);
+                    CodeList.Add(GetCode("jz_peek"));
                     CodeList.Add(1);
 
                     JmpList.Add(CodeList.Count - 1);
@@ -345,7 +430,7 @@ namespace csforth
                         if ((int)CodeList[ival] == 1)
                         {
                             CodeList[ival] = CodeList.Count - ival + 2;
-                            CodeList.Add(-6);   // jmp
+                            CodeList.Add(GetCode("jmp"));   // jmp
                             CodeList.Add(ival - CodeList.Count - 1);     // To begin while
                             continue;
                         }
@@ -357,7 +442,7 @@ namespace csforth
                 if (word[0] == '\"' && word[word.Length - 1] == '\"')
                 {
                     // Строка?
-                    CodeList.Add(-3);
+                    CodeList.Add(GetCode("spush"));
                     CodeList.Add(word.Substring(1, word.Length - 2));
                     continue;
 
@@ -384,21 +469,35 @@ namespace csforth
 
                 if (int.TryParse(word, out ival))
                 {
-                    CodeList.Add(-1);
+                    CodeList.Add(GetCode("ipush"));
                     CodeList.Add(ival);
                     continue;
                 }
 
                 if (double.TryParse(word.Replace('.', DelimiterChar), out dval))
                 {
-                    CodeList.Add(-2);
+                    CodeList.Add(GetCode("dpush"));
                     CodeList.Add(dval);
                     continue;
                 }
 
-                if ((ival = GetCode(word)) != 0)
+                if ((ival = GetCode(word)) >= 0)
                 {
+                    if(MainDic[ival].code != null && MainDic[ival].code[0].GetType() == typeof(List<xWord>))
+                    {
+                        dicStack.Push(MainDic);
+                        MainDic = (List<xWord>)MainDic[ival].code[0];
+                    }
+                    else if (dicStack.Count > 0)
+                    {
+                        MainDic = dicStack.Pop();
+                    }
+
                     CodeList.Add(ival);
+
+                  
+
+
                     continue;
                 }
 
@@ -470,54 +569,20 @@ namespace csforth
             return 0;
         }
         //------------------------------------------------------------------------------
-        //------------------------------------------------------------------------------
-        // double УСЛОВИЯ
-        //------------------------------------------------------------------------------
-        static int g_then_d()
-        {
-            double hi = (double)fStack.Pop();
-            double lo = (double)fStack.Pop();
-
-            fStack.Push(lo > hi ? -1 : 0);
-
-            return 0;
-        }
-        //------------------------------------------------------------------------------
-        static int l_then_d()
-        {
-            double hi = (double)fStack.Pop();
-            double lo = (double)fStack.Pop();
-
-            fStack.Push(lo < hi ? -1 : 0);
-
-            return 0;
-        }
-        //------------------------------------------------------------------------------
-        static int ge_then_d()
-        {
-            double hi = (double)fStack.Pop();
-            double lo = (double)fStack.Pop();
-
-            fStack.Push(lo >= hi ? -1 : 0);
-
-            return 0;
-        }
-        //------------------------------------------------------------------------------
-        static int le_then_d()
-        {
-            double hi = (double)fStack.Pop();
-            double lo = (double)fStack.Pop();
-
-            fStack.Push(lo <= hi ? -1 : 0);
-
-            return 0;
-        }
-        //------------------------------------------------------------------------------
         static int iprint()
         {
             tbOutput.Text = tbOutput.Text + ((int)fStack.Pop()).ToString() + Environment.NewLine;
             tbOutput.Select(tbOutput.Text.Length, 0);
 
+            return 0;
+        }
+        //------------------------------------------------------------------------------
+        static int uprint16()
+        {
+            uint hi = (uint)(int)fStack.Pop();
+            tbOutput.Text = tbOutput.Text + string.Format("{0:X}", hi) + Environment.NewLine;
+            tbOutput.Select(tbOutput.Text.Length, 0);
+            
             return 0;
         }
         //------------------------------------------------------------------------------
@@ -570,21 +635,21 @@ namespace csforth
             // в коде
             //object[] arWC;
 
-            IEnumerable<xWord> ienum = MainDic.Where(e => e.id == CurrentCode);
+            //IEnumerable<xWord> ienum = MainDic.Where(e => e.id == CurrentCode);
 
-            if (ienum != null && ienum.Count() > 0)
-            {
-                // Выполнить код arWC
-                int oldPC = PC;
-                object[] oldRuntimeCode = RuntimeCode;
-                PC = 0;
-                RuntimeCode = ienum.Last().code;
+            //if (ienum != null && ienum.Count() > 0)
 
-                Run();
+            // Выполнить код arWC
+            int oldPC = PC;
+            object[] oldRuntimeCode = RuntimeCode;
+            PC = 0;
+            RuntimeCode = MainDic[CurrentCode].code;
+                //ienum.Last().code;
 
-                PC = oldPC;
-                RuntimeCode = oldRuntimeCode;
-            }
+            Run();
+
+            PC = oldPC;
+            RuntimeCode = oldRuntimeCode;
 
             return 0;
         }
@@ -645,66 +710,6 @@ namespace csforth
             }
 
             throw new FormatException("Ошибка преобразования (double)");
-        }
-        //------------------------------------------------------------------------------
-        static int dplus()
-        {
-            object hi = fStack.Pop();
-            object lo = fStack.Pop();
-
-            if (hi.GetType() == typeof(double) && lo.GetType() == typeof(double))
-            {
-                fStack.Push((double)lo + (double)hi);
-            }
-            else
-                throw new InvalidOperationException("Not valid type (double)");
-
-            return 0;
-        }
-        //------------------------------------------------------------------------------
-        static int dminus()
-        {
-            object hi = fStack.Pop();
-            object lo = fStack.Pop();
-
-            if (hi.GetType() == typeof(double) && lo.GetType() == typeof(double))
-            {
-                fStack.Push((double)lo - (double)hi);
-            }
-            else
-                throw new InvalidOperationException("Not valid type (double)");
-
-            return 0;
-        }
-        //------------------------------------------------------------------------------
-        static int dmul()
-        {
-            object hi = fStack.Pop();
-            object lo = fStack.Pop();
-
-            if (hi.GetType() == typeof(double) && lo.GetType() == typeof(double))
-            {
-                fStack.Push((double)lo * (double)hi);
-            }
-            else
-                throw new InvalidOperationException("Not valid type (double)");
-
-            return 0;
-        }
-        //------------------------------------------------------------------------------
-        static int ddiv()
-        {
-            object hi = fStack.Pop();
-            object lo = fStack.Pop();
-
-            if (hi.GetType() == typeof(double) && lo.GetType() == typeof(double))
-            {
-                fStack.Push((double)lo / (double)hi);
-            }
-            else
-                throw new InvalidOperationException("Not valid type (double)");
-
-            return 0;
         }
         //------------------------------------------------------------------------------
         static int array()
@@ -795,16 +800,21 @@ namespace csforth
         //------------------------------------------------------------------------------
         static int GetCode(string word)
         {
-            int id = 0;
+            int id;
 
             //WordCode.TryGetValue(word, out code);
-            IEnumerable<xWord> ienum = MainDic.Where(e => e.name == word);
-            if (ienum != null && ienum.Count() > 0)
-                id = ienum.Last().id;
+
+            //IEnumerable<xWord> ienum = MainDic.Where(e => e.name == word);
+            //if (ienum != null && ienum.Count() > 0)
+            //    id = ienum.
+
+            for(id = MainDic.Count - 1; id >= 0; id--)
+                if (MainDic[id].name == word) break;
 
             return id;
         }
         //------------------------------------------------------------------------------
+        /*
         static ForthWord GetExec(int id)
         {
             ForthWord exec = null;
@@ -816,6 +826,7 @@ namespace csforth
 
             return exec;
         }
+        */
         //------------------------------------------------------------------------------
         static int ExecWord(string word)
         {
@@ -823,11 +834,12 @@ namespace csforth
 
             if((code = GetCode(word)) != 0)
             {
-                ForthWord exec;
-                if ((exec = GetExec(code)) != null)
-                    exec();
-                else
-                    return 0;
+                //ForthWord exec;
+                //if ((exec = GetExec(code)) != null)
+                //    exec();
+                //else
+                //    return 0;
+                MainDic[code].fun();
             }
 
             return code;

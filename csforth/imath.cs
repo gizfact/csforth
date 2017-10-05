@@ -7,7 +7,7 @@ namespace csforth
     static partial class Core
     {
         //------------------------------------------------------------------------------
-        // MATH WORDS
+        // INTEGER MATH WORDS
         //------------------------------------------------------------------------------
         static int iplus()
         {
@@ -18,11 +18,8 @@ namespace csforth
         //------------------------------------------------------------------------------
         static int iminus()
         {
-            int hi = (int)fStack.Pop();
-            int lo = (int)fStack.Pop();
+            fStack.Push(-(int)fStack.Pop() + (int)fStack.Pop());
 
-            fStack.Push(lo - hi);
-          
             return 0;
         }
         //------------------------------------------------------------------------------
@@ -94,6 +91,7 @@ namespace csforth
             unchecked
             {
                 uint hi = (uint)((int)fStack.Pop()) << 1;
+                //hi <<= 1;
                 fStack.Push((int)hi);
             }
 
@@ -105,6 +103,7 @@ namespace csforth
             unchecked
             {
                 uint hi = (uint)((int)fStack.Pop()) >> 1;
+                //hi >>= 1;
                 fStack.Push((int)hi);
             }
 
