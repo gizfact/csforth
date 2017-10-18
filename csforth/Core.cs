@@ -15,8 +15,17 @@ namespace csforth
     {
         //------------------------------------------------------------------------------
         delegate int ForthWord();
+        enum WordProperty
+        {
+            None = 0,
+            Immediate = 1,
+            NoName = 2,
+            HasCode = 4
+        };
 
         static Stack<object> fStack = new Stack<object>(1024);
+        static List<int> JmpListCur;
+        static List<object> CodeListCur;
 
         static string Input;
         static public string InputText
@@ -39,30 +48,44 @@ namespace csforth
         //------------------------------------------------------------------------------
         struct xWord
         {
-            //public int id;
             public string name;
             public ForthWord fun;
             public object[] code;
+            public WordProperty prop;
             //public List<xWord> sub;
 
-            public xWord(string n, ForthWord f, object[] c = null) { name = n; fun = f; code = c; }
+            public xWord(string n, ForthWord f, WordProperty p = WordProperty.None, object[] c = null) { name = n; fun = f; prop = p; code = c; }
             //public xWord(string n, ForthWord f, List<xWord> s) { name = n; fun = f; code = null; sub = s; }
         };
 
-        static List<xWord> sysDic = new List<xWord>
+        static List<xWord> CoreDic = new List<xWord>
         {
-            new xWord("resetdic", resetdic),
-            new xWord("ipush", ipush ),
-            new xWord("dpush", dpush),
-            new xWord("spush", spush),
-            new xWord("jz", jz),
-            new xWord("jz_peek", jz_peek),
-            new xWord("jmp", jmp),
+            // Core function
+            new xWord("class", class_beg, WordProperty.Immediate),
+            new xWord("/*", comment_beg, WordProperty.Immediate),
+            new xWord(":", compile_beg, WordProperty.Immediate),
+            new xWord(";", compile_end, WordProperty.Immediate),
+            new xWord("if", if_beg, WordProperty.Immediate),
+            new xWord("else", else_word, WordProperty.Immediate),
+            new xWord("while", while_beg, WordProperty.Immediate),
+            new xWord("end", end_word, WordProperty.Immediate),
+            new xWord("str", string_word, WordProperty.Immediate),
+
+            new xWord("resetdic", resetdic, WordProperty.NoName),
+            new xWord("ipush", ipush, WordProperty.NoName),
+            new xWord("dpush", dpush, WordProperty.NoName),
+            new xWord("spush", spush, WordProperty.NoName),
+            new xWord("jz", jz, WordProperty.NoName),
+            new xWord("jz_peek", jz_peek, WordProperty.NoName),
+            new xWord("jmp", jmp, WordProperty.NoName),
+            new xWord("exec", exec, WordProperty.NoName),
+            new xWord("class_exec", class_exec, WordProperty.NoName),
 
             new xWord("word", word),
+            new xWord("inumber", inumber),
+            new xWord("dnumber", dnumber),
             new xWord("find", find),
-            new xWord("exec", exec),
-
+         
             // Stack words
             new xWord("drop", drop),
             new xWord("dup", dup),
@@ -131,7 +154,7 @@ namespace csforth
             new xWord("+s", splus)
         };
 
-        static List<xWord> MainDic = sysDic;
+        static List<xWord> MainDic = CoreDic;
         static List<xWord> ClassDic;
 
         static int BaseLength = 0;
@@ -141,21 +164,16 @@ namespace csforth
         {
             try
             {
-                //ForthWord fw;
-
                 while (PC < RuntimeCode.Length)
                 {
                     CurrentCode = (int)RuntimeCode[PC++];
+                    if (CurrentCode == 0)
+                        CurrentCode = 0;
 
                     MainDic[CurrentCode].fun();
-
-                    //if ((fw = MainDic[CurrentCode].fun) != null)
-                    //{
-                    //    fw();
-                    //}
                 }
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 MessageBox.Show(ex.Message, "Runtime exception", MessageBoxButtons.OK, MessageBoxIcon.Stop);
                 return -1;
@@ -194,17 +212,9 @@ namespace csforth
 
                 for (int i = BaseLength; i < cnt; i++)
                 {
-                    //CodeFun.Remove(WordCode.Values.ElementAt(BaseLength));
-                    //WordCode.Remove(WordCode.Keys.ElementAt(BaseLength));
                     MainDic.RemoveAt(BaseLength);
                 }
             }
-
-            //CodeID = CodeFun.Keys.Max() + 1;
-            //CodeID = MainDic.Max(e => e.id) + 1;
-           
-            // Code
-            //Code.Clear();
 
             // Stack
             fStack.Clear();
@@ -213,9 +223,9 @@ namespace csforth
         static public int Interpret(string input = null, bool isfile = false)
         {
             // Компилируем строку и выполняем
-            if(input != null)
+            if (input != null)
             {
-                if(isfile)
+                if (isfile)
                     Input = File.ReadAllText(input, Encoding.Default);
                 else
                     Input = input;
@@ -227,6 +237,36 @@ namespace csforth
 
             PC = 0;
             return Run();
+        }
+        //------------------------------------------------------------------------------
+        static int inumber()
+        {
+            int ival;
+
+            if (int.TryParse((string)fStack.Pop(), out ival))
+            {
+                fStack.Push(ival);
+                fStack.Push(1);
+            }
+            else
+                fStack.Push(0);
+
+            return 0;
+        }
+        //------------------------------------------------------------------------------
+        static int dnumber()
+        {
+            double dval;
+
+            if (double.TryParse(((string)fStack.Pop()).Replace('.', DelimiterChar), out dval))
+            {
+                fStack.Push(dval);
+                fStack.Push(1);
+            }
+            else
+                fStack.Push(0);
+
+            return 0;
         }
         //------------------------------------------------------------------------------
         static int setdic()
@@ -244,20 +284,197 @@ namespace csforth
             return 0;
         }
         //------------------------------------------------------------------------------
+        static int comment_beg()
+        {
+            // Комментарий
+            int ival = Input.IndexOf("*/", InputPos);
+            if (ival >= 0)
+            {
+                InputPos = ival + 2;
+                return 0;
+            }
+
+            throw new InvalidOperationException("Not finishing comment");
+        }
+        //------------------------------------------------------------------------------
+        static int compile_beg()
+        {
+            if (CompileFlag)
+                throw new InvalidOperationException("Nested compilation");
+            // Компиляция слова
+            string word = Word(Input, ref InputPos);
+            if (word == null)
+                throw new InvalidOperationException("Compiling name absent");
+
+            CompileFlag = true;
+            int ival;
+            xWord x;
+
+            if (ClassFlag)
+            {
+                ClassDic.Add(new xWord(word, class_exec));
+                ival = ClassDic.Count - 1;
+                x = ClassDic[ival];
+                x.code = Compile();
+                ClassDic[ival] = x;
+            }
+            else
+            {
+                MainDic.Add(new xWord(word, exec));
+                ival = MainDic.Count - 1;
+                x = MainDic[ival];
+                x.code = Compile();
+                MainDic[ival] = x;
+            }
+
+            CompileFlag = false;
+
+            return 0;
+        }
+        //------------------------------------------------------------------------------
+        static int compile_end()
+        {
+            if (CompileFlag)
+            {
+                //if (ClassFlag)
+                //{
+                    // в классе
+                //    if (CodeListCur != null)
+                //        CodeListCur.Add(GetCode("resetdic"));
+                //}
+
+                fStack.Push(CodeListCur != null ? CodeListCur.ToArray() : null);
+                CompileFlag = false;
+
+                return 1;
+            }
+
+            if (ClassFlag)
+            {
+                ClassFlag = false;
+                ClassDic = null;
+
+                return 0;
+            }
+
+            throw new InvalidOperationException("Not started compilation");
+        }
+        //------------------------------------------------------------------------------
+        static int if_beg()
+        {
+            // if - если на стеке не 0 идем дальше
+            CodeListCur.Add(GetCode("jz"));
+            // А вот сюда нужно будет смещение положить
+            CodeListCur.Add(0);
+
+            JmpListCur.Add(CodeListCur.Count - 1);
+
+            return 0;
+        }
+        //------------------------------------------------------------------------------
+        static int else_word()
+        {
+            // ничего не компилирует, заполняет смещение
+            if (JmpListCur.Count > 0)
+            {
+                int ival = JmpListCur[JmpListCur.Count - 1];
+                //JmpList.RemoveAt(JmpList.Count - 1);
+
+                if ((int)CodeListCur[ival] == 0)
+                {
+                    CodeListCur[ival] = CodeListCur.Count - ival + 2;
+                    CodeListCur.Add(GetCode("jmp"));
+                    CodeListCur.Add(0);
+                    JmpListCur[JmpListCur.Count - 1] = CodeListCur.Count - 1;
+                    return 0;
+                }
+            }
+
+            throw new InvalidOperationException("Branch word without begin part or incorrect");
+        }
+        //------------------------------------------------------------------------------
+        static int while_beg()
+        {
+            CodeListCur.Add(GetCode("jz_peek"));
+            CodeListCur.Add(1);
+
+            JmpListCur.Add(CodeListCur.Count - 1);
+
+            return 0;
+        }
+        //------------------------------------------------------------------------------
+        static int end_word()
+        {
+            // ничего не компилирует, заполняет смещение
+
+            if (JmpListCur.Count > 0)
+            {
+                int ival = JmpListCur[JmpListCur.Count - 1];
+                JmpListCur.RemoveAt(JmpListCur.Count - 1);
+                if ((int)CodeListCur[ival] == 0)
+                {
+                    CodeListCur[ival] = CodeListCur.Count - ival;
+                    return 0;
+                }
+                if ((int)CodeListCur[ival] == 1)
+                {
+                    CodeListCur[ival] = CodeListCur.Count - ival + 2;
+                    CodeListCur.Add(GetCode("jmp"));   // jmp
+                    CodeListCur.Add(ival - CodeListCur.Count - 1);     // To begin while
+                    return 0;
+                }
+            }
+
+            throw new InvalidOperationException("End without begin part or incorrect");
+        }
+        //------------------------------------------------------------------------------
+        static int string_word()
+        {
+            string word = Word(Input, ref InputPos);
+
+            if (word[0] == '\"' && word[word.Length - 1] == '\"')
+            {
+                // Строка?
+                CodeListCur.Add(GetCode("spush"));
+                CodeListCur.Add(word.Substring(1, word.Length - 2));
+            }
+
+            return 0;
+        }
+        //------------------------------------------------------------------------------
+        static int class_beg()
+        {
+            if (ClassFlag || CompileFlag)
+                throw new InvalidOperationException("Nested class/compilation definition");
+
+            // Компиляция класса
+            ClassFlag = true;
+
+            string word = Word(Input, ref InputPos);
+            if (word == null)
+                throw new InvalidOperationException("Class name absent");
+
+            ClassDic = new List<xWord>();
+            object[] obj = new object[1];
+            obj[0] = ClassDic;
+            MainDic.Add(new xWord(word, setdic, WordProperty.None, obj));
+
+            return 0;
+        }
+        //------------------------------------------------------------------------------
         static object[] Compile()
         {
-            //static int BaseLength = 0;
-            //static int CodeID;
-            // WordCode, CodeFun
             if(BaseLength == 0)
-            {
                 BaseLength = MainDic.Count;
-                //CodeID = CodeFun.Keys.Max() + 1;
-                //CodeID = MainDic.Max(e => e.id) + 1;
-            }
 
             List<int> JmpList = new List<int>();
             List<object> CodeList = new List<object>();
+
+            List<int> JmpCur = JmpListCur;
+            JmpListCur= JmpList;
+            List<object> CodeCur = CodeListCur;
+            CodeListCur = CodeList;
+
             string word;
 
             int ival;
@@ -265,207 +482,8 @@ namespace csforth
 
             while ((word = Word(Input, ref InputPos)) != null)
             {
-                if(word == "/*")
-                {
-                    // Комментарий
-                    ival = Input.IndexOf("*/", InputPos);
-                    if(ival >= 0)
-                    {
-                        InputPos = ival + 2;
-                        continue;
-                    }
-
-                    throw new InvalidOperationException("Not finishing comment");
-                }
-
-                if (word == ":")
-                {
-                    if (CompileFlag)
-                        throw new InvalidOperationException("Nested compilation");
-                    // Компиляция слова
-                    word = Word(Input, ref InputPos);
-                    if (word == null)
-                        throw new InvalidOperationException("Compiling name absent");
-
-                    //WordCode.Add(word, CodeID);
-                    //CodeFun.Add(CodeID, exec);
-                    
-                    
-                    CompileFlag = true;
-                    xWord x;
-
-                    if (ClassFlag)
-                    {
-                        ClassDic.Add(new xWord(word, exec));
-                        ival = ClassDic.Count - 1;
-                        x = ClassDic[ival];
-                        x.code = Compile();
-                        ClassDic[ival] = x;
-                    }
-                    else
-                    {
-                        MainDic.Add(new xWord(word, exec));
-                        ival = MainDic.Count - 1;
-                        x = MainDic[ival];
-                        x.code = Compile();
-                        MainDic[ival] = x;
-                    }
-                    //object[] arWC = Compile();
-                    //xWord x = new xWord(
-                    //    MainDic[ival].name,
-                    //    MainDic[ival].id,
-                    //    MainDic[ival].fun,
-                    //    arWC);
-
-                    
-                    
-
-                   
-                 
-                    //MainDic[MainDic.Count - 1].code = Compile();
-                    //Code.Add(CodeID++, arWC);
-                    
-                    CompileFlag = false;
-                    continue;
-                }
-
-                if(word == "class")
-                {
-                    if(ClassFlag || CompileFlag)
-                        throw new InvalidOperationException("Nested class definition");
-
-                    // Компиляция класса
-                    ClassFlag = true;
-
-                    word = Word(Input, ref InputPos);
-                    if (word == null)
-                        throw new InvalidOperationException("Class name absent");
-
-                    ClassDic = new List<xWord>();
-                    object[] obj = new object[1];
-                    obj[0] = ClassDic;
-                    MainDic.Add(new xWord(word, setdic, obj));
-                    continue;
-                }
-
-                if (word == ";")
-                {
-                    if (CompileFlag)
-                    {
-                        if(ClassFlag)
-                        {
-                            // в классе
-                            if (CodeList != null)
-                                CodeList.Add(GetCode("resetdic"));
-                            //ClassDic = null;
-                        }
-                        return CodeList != null ? CodeList.ToArray() : null;
-                    }
-
-                    if(ClassFlag)
-                    {
-                        ClassFlag = false;
-                        ClassDic = null;
-
-                        continue;
-                    }
-
-                    
-                    throw new InvalidOperationException("Not started compilation");
-                }
-
-                if (word == "if")
-                {
-                    // if - если на стеке не 0 идем дальше
-                    CodeList.Add(GetCode("jz"));
-                    // А вот сюда нужно будет смещение положить
-                    CodeList.Add(0);
-
-                    JmpList.Add(CodeList.Count - 1);
-                    continue;
-                }
-
-                if(word == "else")
-                {
-                    // ничего не компилирует, заполняет смещение
-                    if (JmpList.Count > 0)
-                    {
-                        ival = JmpList[JmpList.Count - 1];
-                        //JmpList.RemoveAt(JmpList.Count - 1);
-
-                        if ((int)CodeList[ival] == 0)
-                        {
-                            CodeList[ival] = CodeList.Count - ival + 2;
-                            CodeList.Add(GetCode("jmp"));
-                            CodeList.Add(0);
-                            JmpList[JmpList.Count - 1] = CodeList.Count - 1;
-                            continue;
-                        }
-                    }
-
-                    throw new InvalidOperationException("Branch word without begin part or incorrect");
-                }
-
-                if (word == "while")
-                {
-                    CodeList.Add(GetCode("jz_peek"));
-                    CodeList.Add(1);
-
-                    JmpList.Add(CodeList.Count - 1);
-                    continue;
-                }
-
-                if (word == "end")
-                {
-                    // ничего не компилирует, заполняет смещение
-                    if (JmpList.Count > 0)
-                    {
-                        ival = JmpList[JmpList.Count - 1];
-                        JmpList.RemoveAt(JmpList.Count - 1);
-                        if ((int)CodeList[ival] == 0)
-                        {
-                            CodeList[ival] = CodeList.Count - ival;
-                            continue;
-                        }
-                        if ((int)CodeList[ival] == 1)
-                        {
-                            CodeList[ival] = CodeList.Count - ival + 2;
-                            CodeList.Add(GetCode("jmp"));   // jmp
-                            CodeList.Add(ival - CodeList.Count - 1);     // To begin while
-                            continue;
-                        }
-                    }
-
-                    throw new InvalidOperationException("End without begin part or incorrect");
-                }
-
-                if (word[0] == '\"' && word[word.Length - 1] == '\"')
-                {
-                    // Строка?
-                    CodeList.Add(GetCode("spush"));
-                    CodeList.Add(word.Substring(1, word.Length - 2));
-                    continue;
-
-                    /*
-                    ival = Input.IndexOf("\"", InputPos);
-                    if (ival >= 0)
-                    {
-                        InputPos = ival + 1;
-                        ival = Input.IndexOf("\"", InputPos);
-                        if (ival >= 0)
-                        {
-                            word = Input.Substring(InputPos, ival - InputPos);
-                            CodeList.Add(-3);
-                            CodeList.Add(word);
-                            InputPos = ival + 1;
-                            continue;
-                        }
-                    }
-
-                    // Косяк
-                    throw new InvalidOperationException("Not valid type (literal)");
-                    */
-                }
+                if (word == "format")
+                    ival = 0;
 
                 if (int.TryParse(word, out ival))
                 {
@@ -483,6 +501,25 @@ namespace csforth
 
                 if ((ival = GetCode(word)) >= 0)
                 {
+                    //if((CoreDic[ival].prop & WordProperty.Immediate) != WordProperty.None)
+
+                    if ((MainDic[ival].prop & WordProperty.Immediate) != WordProperty.None)
+                    {
+                        // Слово немедленного исполнения
+                        //ival = CoreDic[ival].fun();
+                        ival = MainDic[ival].fun();
+
+                        if (ival == 1)
+                        {
+                            JmpListCur = JmpCur;
+                            CodeListCur = CodeCur;
+
+                            return (object[])fStack.Pop();
+                        }
+
+                        continue;
+                    }
+
                     if(MainDic[ival].code != null && MainDic[ival].code[0].GetType() == typeof(List<xWord>))
                     {
                         dicStack.Push(MainDic);
@@ -493,10 +530,8 @@ namespace csforth
                         MainDic = dicStack.Pop();
                     }
 
-                    CodeList.Add(ival);
-
                   
-
+                    CodeList.Add(ival);
 
                     continue;
                 }
@@ -504,6 +539,9 @@ namespace csforth
                 // Косяк
                 throw new InvalidOperationException("Not valid word");
             }
+
+            JmpListCur = JmpCur;
+            CodeListCur = CodeCur;
 
             return CodeList != null ? CodeList.ToArray() : null;
         }
@@ -632,19 +670,26 @@ namespace csforth
         //------------------------------------------------------------------------------
         static int exec()
         {
-            // в коде
-            //object[] arWC;
-
-            //IEnumerable<xWord> ienum = MainDic.Where(e => e.id == CurrentCode);
-
-            //if (ienum != null && ienum.Count() > 0)
-
-            // Выполнить код arWC
             int oldPC = PC;
             object[] oldRuntimeCode = RuntimeCode;
             PC = 0;
             RuntimeCode = MainDic[CurrentCode].code;
-                //ienum.Last().code;
+
+            Run();
+
+            PC = oldPC;
+            RuntimeCode = oldRuntimeCode;
+
+            return 0;
+        }
+        //------------------------------------------------------------------------------
+        static int class_exec()
+        {
+            int oldPC = PC;
+            object[] oldRuntimeCode = RuntimeCode;
+            PC = 0;
+            RuntimeCode = MainDic[CurrentCode].code;
+            MainDic = dicStack.Pop();
 
             Run();
 

@@ -25,9 +25,9 @@ namespace csforth
             //    " : my -7.5 dup >i ; : my2 my ; : my3 my2 ; my3 if \" Hello, world!\" 3.14 -11 >d /d .d .s end >i .";
             //"1000 while 1 - dup . end";
 
-            //Core.Interpret("0 if \" true\" else \" false\" end .s");
-            Core.Interpret("class string : .s \"!\" +s .s ; ; \"Hello\" string .s");
-            //Core.Interpret("test.txt", true);
+            //Core.Interpret("1 if str \"     true\" else str \"false\" end .s");
+            //Core.Interpret("class string : .s \"!\" +s .s ; ; \"Hello\" string .s");
+            Core.Interpret("test.txt", true);
             
             //Core.Interpret("5 5 + . /* Какая-то хрень*/ 7.0 7.0 /d .d");
 

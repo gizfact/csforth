@@ -1,7 +1,7 @@
 /* Пример программы */
 
 : Test
-	if "true" else "false" end
+	if str "true" else str "false" end
 ;
 
 : Divide
@@ -18,14 +18,14 @@
 
 class string
 	: .s
-		"Hello from class: " swap +s .s
+		str "Hello from class: " swap +s .s
 	;
 ;
 
 : Goal
 	1.5 ->i Test Divide .s 100.0 Fact .d
-	"Hello, world!" dup " world" dup -rot s.pos swap rot .s .s .
-	-1 dup asr swap asl 2 "Хрень: " "{0:X}, {1:X}" +s format string .s
+	str "Hello, world!" dup str " world" dup -rot s.pos swap rot .s .s .
+	-1 dup asr swap asl 2 str "Хрень: " str "{0:X}, {1:X}" +s format string .s
 ; 
 
 Goal
