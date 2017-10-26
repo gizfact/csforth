@@ -1,6 +1,14 @@
 /* Ïğèìåğ ïğîãğàììû */
+: true  -1 ;
+: false  0 ;
 
 : Test
+	var $I
+	var $D
+	var $S
+	$I 777 !
+	$D 3.14159 !
+	$S str "variable" !
 	if str "true" else str "false" end
 ;
 
@@ -16,17 +24,45 @@
   end
 ;
 
-class string
+class #õğåíü
+	var $èä
+
 	: .s
-		str "Hello from class: " swap +s dup .s
+		str "Hello from class: " swap +s .s #õğåíü $èä str "êóêó" !
+	;
+
+	: .
+		1 str "Èç êëàññà: " str "{0:D}" +s format .s
 	;
 ;
 
 : Goal
 	1.5 ->i Test Divide .s 100.0 Fact .d
 	str "Hello, world!" dup str " world" dup -rot s.pos swap rot .s .s .
-	-1 dup asr swap asl 2 str "Õğåíü: " str "{0:X}, {1:X}" +s format .s
+	-1 dup asr swap asl 2 str "Õğåíü: " str "{0:X}, {1:X}" +s format #õğåíü .s 999 #õğåíü .
 ; 
 
-Goal
+: Len 1024 ;
 
+/*
+Goal $I @ . $D @ .d $S @ .s #õğåíü $èä @ .s
+
+array arX 0
+
+arX Len new @
+Len while dup -rot Len swap - dup [!] swap 1- end drop
+str "ok" .s
+Len while dup -rot Len swap - [@] . swap 1- end
+
+$I type typename .s
+$D type typename .s
+$S type typename .s
+
+arX forget
+
+$I $D $S forget forget forget
+*/
+
+str "server1c" str "3052" str "e:\iadb\iapteka0.fdb" FBOpen
+str "select * from medicine order by 2" FBSelect /* FBRowCount */ 2048
+0 true while drop rot swap dup -rot 1 FBCell .s -rot 1+ 2dup > end

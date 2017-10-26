@@ -46,120 +46,6 @@ namespace csforth
 
         static Stack<List<xWord>> dicStack = new Stack<List<xWord>>(32);
         //------------------------------------------------------------------------------
-        struct xWord
-        {
-            public string name;
-            public ForthWord fun;
-            public object[] code;
-            public WordProperty prop;
-            //public List<xWord> sub;
-
-            public xWord(string n, ForthWord f, WordProperty p = WordProperty.None, object[] c = null) { name = n; fun = f; prop = p; code = c; }
-            //public xWord(string n, ForthWord f, List<xWord> s) { name = n; fun = f; code = null; sub = s; }
-        };
-
-        static List<xWord> CoreDic = new List<xWord>
-        {
-            // Core function
-            new xWord("class", class_beg, WordProperty.Immediate),
-            new xWord("/*", comment_beg, WordProperty.Immediate),
-            new xWord(":", compile_beg, WordProperty.Immediate),
-            new xWord(";", compile_end, WordProperty.Immediate),
-            new xWord("if", if_beg, WordProperty.Immediate),
-            new xWord("else", else_word, WordProperty.Immediate),
-            new xWord("while", while_beg, WordProperty.Immediate),
-            new xWord("end", end_word, WordProperty.Immediate),
-            new xWord("str", string_word, WordProperty.Immediate),
-
-            new xWord("resetdic", resetdic, WordProperty.NoName),
-            new xWord("ipush", ipush, WordProperty.NoName),
-            new xWord("dpush", dpush, WordProperty.NoName),
-            new xWord("spush", spush, WordProperty.NoName),
-            new xWord("jz", jz, WordProperty.NoName),
-            new xWord("jz_peek", jz_peek, WordProperty.NoName),
-            new xWord("jmp", jmp, WordProperty.NoName),
-            new xWord("exec", exec, WordProperty.NoName),
-            new xWord("class_exec", class_exec, WordProperty.NoName),
-
-            new xWord("word", word),
-            new xWord("inumber", inumber),
-            new xWord("dnumber", dnumber),
-            new xWord("find", find),
-         
-            // Stack words
-            new xWord("drop", drop),
-            new xWord("dup", dup),
-            new xWord("swap", swap),
-            new xWord("over", over),
-            new xWord("rot", rot),
-            new xWord("-rot", nrot),
-
-            // iMath words
-            new xWord("+", iplus),
-            new xWord("-", iminus),
-            new xWord("*", imul),
-            new xWord("/", idiv),
-            new xWord("1+", inc),
-            new xWord("1-", dec),
-            new xWord("asl", asl),
-            new xWord("asr", asr),
-            new xWord("asln", asln),
-            new xWord("asrn", asrn),
-            new xWord("shl", shl),
-            new xWord("shr", shr),
-            new xWord("shln", shln),
-            new xWord("shrn", shrn),
-            new xWord("abs", abs),
-            new xWord("neg", neg),
-            new xWord("not", not),
-            new xWord("and", and),
-            new xWord("or", or),
-            new xWord("xor", xor),
-
-            // dMath words
-            new xWord("+d", dplus),
-            new xWord("-d", dminus),
-            new xWord("*d", dmul),
-            new xWord("/d", ddiv),
-            new xWord("absd", dabs),
-            new xWord("negd", dneg),
-
-            // Convertation words
-            new xWord("a->i", atoi),
-            new xWord("a->d", atod),
-            new xWord("->i", toi),
-            new xWord("->d", tod),
-
-            // Output
-            new xWord(".", iprint),
-            new xWord(".d", dprint),
-            new xWord(".s", sprint),
-            new xWord("cls", cls),
-            new xWord(".u16", uprint16),
-
-            // Условия
-            new xWord(">", g_then),
-            new xWord("<", l_then),
-            new xWord(">=", ge_then),
-            new xWord("<=", le_then),
-            new xWord(">d", g_then_d),
-            new xWord("<d", l_then_d),
-            new xWord(">=d", ge_then_d),
-            new xWord("<=d", le_then_d),
-
-            // Строковые
-            new xWord("s[]", schar),
-            new xWord("s.pos", spos),
-            new xWord("format", format),
-            new xWord("+s", splus)
-        };
-
-        static List<xWord> MainDic = CoreDic;
-        static List<xWord> ClassDic;
-
-        static int BaseLength = 0;
-        //static int CodeID;
-        //------------------------------------------------------------------------------
         static int Run()
         {
             try
@@ -167,9 +53,6 @@ namespace csforth
                 while (PC < RuntimeCode.Length)
                 {
                     CurrentCode = (int)RuntimeCode[PC++];
-                    if (CurrentCode == 0)
-                        CurrentCode = 0;
-
                     MainDic[CurrentCode].fun();
                 }
             }
@@ -201,12 +84,7 @@ namespace csforth
         //------------------------------------------------------------------------------
         static public void Clear()
         {
-            // WordCode, CodeFun
-            if (BaseLength == 0)
-            {
-                BaseLength = MainDic.Count;
-            }
-            else
+            if(BaseLength > 0)
             {
                 int cnt = MainDic.Count;
 
@@ -269,6 +147,98 @@ namespace csforth
             return 0;
         }
         //------------------------------------------------------------------------------
+        static int var_word()
+        {
+            // Переменная
+            string word = Word(Input, ref InputPos);
+            object[] obj = new object[1];
+            obj[0] = new object();
+            if (!ClassFlag)
+                MainDic.Add(new xWord(word, var_exec, WordProperty.NoName, obj));
+            else
+                ClassDic.Add(new xWord(word, var_class_exec, WordProperty.NoName, obj));
+          
+            return 0;
+        }
+        //------------------------------------------------------------------------------
+        static int array_word()
+        {
+            // Массив с определенной длиной
+            
+            string word = Word(Input, ref InputPos);
+            int capacity = int.Parse(Word(Input, ref InputPos));
+
+            object[] obj = new object[1];
+            if(capacity > 0)
+                obj[0] = new object[capacity];
+
+            if (!ClassFlag)
+                MainDic.Add(new xWord(word, var_exec, WordProperty.NoName, obj));
+            else
+                ClassDic.Add(new xWord(word, var_class_exec, WordProperty.NoName, obj));
+
+            return 0;
+        }
+        //------------------------------------------------------------------------------
+        static int arrnew_word()
+        {
+            //
+            int capacity = (int)fStack.Pop();
+            object[] arr = (object[])fStack.Pop();
+
+            arr[0] = new object[capacity];
+
+            fStack.Push(arr);
+
+            return 0;
+        }
+        //------------------------------------------------------------------------------
+        static int frommem()
+        { 
+            object[] hi = (object[])fStack.Pop();
+            fStack.Push(hi[0]);
+
+            return 0;
+        }
+
+        static int tomem()
+        {
+            object hi = fStack.Pop();
+            object[] lo = (object[])fStack.Pop();
+            lo[0] = hi;
+
+            return 0;
+        }
+
+        static int fromarr()
+        {
+            int index = (int)fStack.Pop();
+            object[] arr = (object[])fStack.Peek();
+            fStack.Push(arr[index]);
+
+            return 0;
+        }
+
+        static int toarr()
+        {
+            object val = fStack.Pop();
+            int index = (int)fStack.Pop();
+            object[] arr = (object[])fStack.Peek();
+            arr[index] = val;
+
+            return 0;
+        }
+
+        static int initarr()
+        {
+            int cnt = (int)fStack.Pop();
+            object[] arr = (object[])fStack.ElementAt(cnt);
+            for (int i = 0; i < cnt; i++)
+                arr[i] = fStack.Pop();
+
+            return 0;
+        }
+        //------------------------------------------------------------------------------
         static int setdic()
         {
             dicStack.Push(MainDic);
@@ -277,12 +247,12 @@ namespace csforth
             return 0;
         }
         //------------------------------------------------------------------------------
-        static int resetdic()
-        {
-            MainDic = dicStack.Pop();
-
-            return 0;
-        }
+        //static int resetdic()
+        //{
+        //    MainDic = dicStack.Pop();
+        //
+        //    return 0;
+        //}
         //------------------------------------------------------------------------------
         static int comment_beg()
         {
@@ -336,13 +306,6 @@ namespace csforth
         {
             if (CompileFlag)
             {
-                //if (ClassFlag)
-                //{
-                    // в классе
-                //    if (CodeListCur != null)
-                //        CodeListCur.Add(GetCode("resetdic"));
-                //}
-
                 fStack.Push(CodeListCur != null ? CodeListCur.ToArray() : null);
                 CompileFlag = false;
 
@@ -428,7 +391,14 @@ namespace csforth
             throw new InvalidOperationException("End without begin part or incorrect");
         }
         //------------------------------------------------------------------------------
-        static int string_word()
+        static int idle()
+        {
+            Application.DoEvents();
+
+            return 0;
+        }
+        //------------------------------------------------------------------------------
+        static int str_word()
         {
             string word = Word(Input, ref InputPos);
 
@@ -464,8 +434,8 @@ namespace csforth
         //------------------------------------------------------------------------------
         static object[] Compile()
         {
-            if(BaseLength == 0)
-                BaseLength = MainDic.Count;
+            //if(BaseLength == 0)
+            //    BaseLength = MainDic.Count;
 
             List<int> JmpList = new List<int>();
             List<object> CodeList = new List<object>();
@@ -482,8 +452,8 @@ namespace csforth
 
             while ((word = Word(Input, ref InputPos)) != null)
             {
-                if (word == "format")
-                    ival = 0;
+                //if (word == "format")
+                //    ival = 0;
 
                 if (int.TryParse(word, out ival))
                 {
@@ -506,10 +476,7 @@ namespace csforth
                     if ((MainDic[ival].prop & WordProperty.Immediate) != WordProperty.None)
                     {
                         // Слово немедленного исполнения
-                        //ival = CoreDic[ival].fun();
-                        ival = MainDic[ival].fun();
-
-                        if (ival == 1)
+                        if (MainDic[ival].fun() == 1)
                         {
                             JmpListCur = JmpCur;
                             CodeListCur = CodeCur;
@@ -520,7 +487,7 @@ namespace csforth
                         continue;
                     }
 
-                    if(MainDic[ival].code != null && MainDic[ival].code[0].GetType() == typeof(List<xWord>))
+                    if(MainDic[ival].code != null && MainDic[ival].code[0] != null && MainDic[ival].code[0].GetType() == typeof(List<xWord>))
                     {
                         dicStack.Push(MainDic);
                         MainDic = (List<xWord>)MainDic[ival].code[0];
@@ -529,8 +496,7 @@ namespace csforth
                     {
                         MainDic = dicStack.Pop();
                     }
-
-                  
+    
                     CodeList.Add(ival);
 
                     continue;
@@ -642,29 +608,101 @@ namespace csforth
         //------------------------------------------------------------------------------
         static int atoi()
         {
-            fStack.Push(PopIntEx());
+            fStack.Push(int.Parse((string)fStack.Pop()));
 
             return 0;
         }
         //------------------------------------------------------------------------------
         static int atod()
         {
-            fStack.Push(PopDoubleEx());
+            fStack.Push(double.Parse((string)fStack.Pop()));
+
+            return 0;
+        }
+        //------------------------------------------------------------------------------
+        static int gettype()
+        {
+            if(fStack.Peek().GetType() == typeof(object[]))
+                fStack.Push(((object[])fStack.Pop())[0].GetType());
+            else
+                fStack.Push(fStack.Pop().GetType());
+
+            return 0;
+        }
+        //------------------------------------------------------------------------------
+        static int gettypename()
+        {
+            fStack.Push(((Type)fStack.Pop()).Name);
 
             return 0;
         }
         //------------------------------------------------------------------------------
         static int find()
         {
-            string word;
-
             if (fStack.Peek().GetType() == typeof(string))
-                word = (string)fStack.Pop();
-            else
-                throw new InvalidOperationException("Несоответствие типов (string)");
+                return sfind();
 
+            object[] arrcode = (object[])fStack.Pop();
+            if(arrcode == null)
+            {
+                fStack.Push(-1);
+                return 0;
+            }
+
+            int i;
+
+            for(i = MainDic.Count - 1; i >= 0; i--)
+            {
+                if (MainDic[i].code == arrcode)
+                    break;
+            }
+
+            fStack.Push(i);
+
+            return 0;
+        }
+        //------------------------------------------------------------------------------
+        static int sfind()
+        {
+            string word = (string)fStack.Pop();
+         
             fStack.Push(GetCode(word));
 
+            return 0;
+        }
+        //------------------------------------------------------------------------------
+        static int var_exec()
+        {
+            fStack.Push(MainDic[CurrentCode].code);
+
+            return 0;
+        }
+
+        static int var_class_exec()
+        {
+            fStack.Push(MainDic[CurrentCode].code);
+            MainDic = dicStack.Pop();
+
+            return 0;
+        }
+        //------------------------------------------------------------------------------
+        static int forget()
+        {
+            object[] arrcode = (object[])fStack.Pop();
+            if (arrcode == null) return 0;
+
+            int blen = (MainDic == CoreDic) ? BaseLength : 0;
+
+            for (int i = MainDic.Count - 1; i >= blen; i--)
+            {
+                if(MainDic[i].code == arrcode)
+                {
+                    //MainDic.RemoveAt(i);
+                    MainDic[i] = new xWord();
+                    break;
+                }
+            }
+          
             return 0;
         }
         //------------------------------------------------------------------------------
@@ -757,46 +795,47 @@ namespace csforth
             throw new FormatException("Ошибка преобразования (double)");
         }
         //------------------------------------------------------------------------------
-        static int array()
-        {
-            int capacity = PopInt();
+        //static int array()
+        //{
+        //    int capacity = (int)fStack.Pop();
 
-            object[] arr = new object[capacity];
-            fStack.Push(arr);
+        //    object[] arr = new object[capacity];
+        //    fStack.Push(arr);
 
-            return 0;
-        }
+        //    return 0;
+        //}
         //------------------------------------------------------------------------------
-        static int PopInt()
-        {
-            object obj = fStack.Peek();
+        //static int PopInt()
+        //{
+        //    object obj = fStack.Peek();
 
-            if (obj.GetType() == typeof(int))
-                return (int)fStack.Pop();
+        //    if (obj.GetType() == typeof(int))
+        //        return (int)fStack.Pop();
 
-            throw new InvalidOperationException("Not valid type (integer)");
-        }
+        //    throw new InvalidOperationException("Not valid type (integer)");
+        //}
         //------------------------------------------------------------------------------
-        static double PopDouble()
-        {
-            object obj = fStack.Peek();
+        //static double PopDouble()
+        //{
+        //    object obj = fStack.Peek();
 
-            if (obj.GetType() == typeof(double))
-                return (double)fStack.Pop();
+        //    if (obj.GetType() == typeof(double))
+        //        return (double)fStack.Pop();
 
-            throw new InvalidOperationException("Not valid type (double)");
-        }
+        //    throw new InvalidOperationException("Not valid type (double)");
+        //}
         //------------------------------------------------------------------------------
-        static string PopString()
-        {
-            object obj = fStack.Peek();
+        //static string PopString()
+        //{
+        //    object obj = fStack.Peek();
 
-            if (obj.GetType() == typeof(string))
-                return (string)fStack.Pop();
+        //    if (obj.GetType() == typeof(string))
+        //        return (string)fStack.Pop();
 
-            throw new InvalidOperationException("Not valid type (string)");
-        }
+        //    throw new InvalidOperationException("Not valid type (string)");
+        //}
         //------------------------------------------------------------------------------
+        /*
         static int PopIntEx()
         {
             object obj = fStack.Peek();
@@ -842,6 +881,7 @@ namespace csforth
 
             return fStack.Pop().ToString();
         }
+        */
         //------------------------------------------------------------------------------
         static int GetCode(string word)
         {
@@ -929,6 +969,51 @@ namespace csforth
                 return stream.Substring(pos, curpos - pos);
 
             return null;
+        }
+        //------------------------------------------------------------------------------
+        static int fbopen()
+        {
+            string dbpath = (string)fStack.Pop();
+            string port = (string)fStack.Pop();
+            string server = (string)fStack.Pop();
+
+            fStack.Push(new FirebirdDB(server, port, dbpath));
+
+            return 0;
+        }
+        //------------------------------------------------------------------------------
+        static int fbselect()
+        {
+            string sql = (string)fStack.Pop();
+            FirebirdDB fdb = (FirebirdDB)fStack.Pop();
+
+            fStack.Push(fdb.Select(sql));
+
+            return 0;
+        }
+        //------------------------------------------------------------------------------
+        static int fbcell()
+        {
+            int x = (int)fStack.Pop();
+            int y = (int)fStack.Pop();
+       
+            fStack.Push(((object[][])fStack.Peek())[y][x].ToString());
+
+            return 0;
+        }
+        //------------------------------------------------------------------------------
+        static int fbcolcount()
+        {
+            fStack.Push(((object[][])fStack.Peek())[0].Length);
+
+            return 0;
+        }
+        //------------------------------------------------------------------------------
+        static int fbrowcount()
+        {
+            fStack.Push(((object[][])fStack.Peek()).Length);
+
+            return 0;
         }
         //------------------------------------------------------------------------------
     }

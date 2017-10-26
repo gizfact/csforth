@@ -16,16 +16,20 @@
   end
 ;
 
-class string
+class #хрень
 	: .s
-		str "Hello from class: " swap +s dup .s
+		str "Hello from class: " swap +s .s
+	;
+
+	: .
+		1 str "Из класса: " str "{0:X}" +s format .s
 	;
 ;
 
 : Goal
 	1.5 ->i Test Divide .s 100.0 Fact .d
 	str "Hello, world!" dup str " world" dup -rot s.pos swap rot .s .s .
-	-1 dup asr swap asl 2 str "Хрень: " str "{0:X}, {1:X}" +s format .s
+	-1 dup asr swap asl 2 str "Хрень: " str "{0:X}, {1:X}" +s format #хрень .s 999 #хрень .
 ; 
 
 Goal

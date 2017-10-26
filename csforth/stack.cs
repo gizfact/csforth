@@ -23,6 +23,14 @@ namespace csforth
             return 0;
         }
         //------------------------------------------------------------------------------
+        static int dup2()
+        {
+            fStack.Push(fStack.ElementAt(1));
+            fStack.Push(fStack.ElementAt(1));
+
+            return 0;
+        }
+        //------------------------------------------------------------------------------
         static int swap()
         {
             object hi = fStack.Pop();

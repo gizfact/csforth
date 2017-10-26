@@ -27,7 +27,7 @@ namespace csforth
 
             //Core.Interpret("1 if str \"     true\" else str \"false\" end .s");
             //Core.Interpret("class string : .s \"!\" +s .s ; ; \"Hello\" string .s");
-            Core.Interpret("test.txt", true);
+            //Core.Interpret("test.txt", true);
             
             //Core.Interpret("5 5 + . /* Какая-то хрень*/ 7.0 7.0 /d .d");
 
@@ -41,6 +41,13 @@ namespace csforth
 
             //Core.Interpret("cls \" Ok!\" .s");
             
+        }
+
+        private void интерпретацияToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            Core.Interpret("test.txt", true);
+
+          
         }
         //------------------------------------------------------------------------------
     }

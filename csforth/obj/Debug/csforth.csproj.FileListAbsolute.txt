@@ -23,3 +23,6 @@ d:\Repos\csforth\csforth\obj\Debug\csforth.Form1.resources
 d:\Repos\csforth\csforth\obj\Debug\csforth.Properties.Resources.resources
 d:\Repos\csforth\csforth\obj\Debug\csforth.csproj.GenerateResource.Cache
 d:\repos\cs\csforth\csforth\bin\Debug\test.txt
+d:\repos\cs\csforth\csforth\bin\Debug\csforth.exe.config
+d:\repos\cs\csforth\csforth\bin\Debug\FirebirdSql.Data.FirebirdClient.dll
+d:\repos\cs\csforth\csforth\bin\Debug\FirebirdSql.Data.FirebirdClient.pdb
